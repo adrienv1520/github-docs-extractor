@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.png" alt="GitHub Docs Extractor"/>
+  <img src="docs/logo.png" width="200" height="200" alt="GitHub Docs Extractor"/>
 <p>
 
 <!-- omit in toc -->
