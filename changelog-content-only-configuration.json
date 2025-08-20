@@ -1,0 +1,11 @@
+{
+  "categories": [
+    {
+      "title": "Changes",
+      "labels": ["*"]
+    }
+  ],
+  "template": "{{#each categories}}{{#if prs.length}}{{> category_template}}{{/if}}{{/each}}",
+  "pr_template": "- {{subject}}",
+  "category_template": "{{#each prs}}{{> pr_template}}{{/each}}"
+}

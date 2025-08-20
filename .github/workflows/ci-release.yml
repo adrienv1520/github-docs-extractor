@@ -1,0 +1,113 @@
+# .github/workflows/ci-release.yml
+
+name: CI & Release
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  ci:
+    name: CI (Lint & Test)
+    if: "!startsWith(github.ref, 'refs/tags/')"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+  release:
+    name: Release & Publish
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    permissions:
+      contents: write
+
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Get previous tag
+        id: previoustag
+        uses: "ambactions/get-previous-tag@v1"
+
+      - name: Generate release notes content
+        id: changelog_content
+        uses: mikepenz/release-changelog-builder-action@v4
+        with:
+          fromTag: ${{ steps.previoustag.outputs.tag }}
+          toTag: ${{ github.ref_name }}
+          configuration: "changelog-content-only-configuration.json"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update CHANGELOG.md and set release body
+        id: update_changelog
+        run: |
+          CHANGELOG_HEADER="## v${{ github.ref_name }} - $(date +'%d/%m/%Y')"
+          echo -e "${CHANGELOG_HEADER}\n" > new_entry.tmp
+          echo "${{ steps.changelog_content.outputs.changelog }}" >> new_entry.tmp
+
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          cat new_entry.tmp >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          tail -n +2 CHANGELOG.md 2>/dev/null > old_body.tmp
+          {
+            echo "# Changelog";
+            echo "";
+            cat new_entry.tmp;
+            echo "";
+            cat old_body.tmp;
+          } > CHANGELOG.md
+
+          rm new_entry.tmp old_body.tmp
+
+      - name: Commit updated CHANGELOG.md
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(release): update CHANGELOG.md for ${{ github.ref_name }}"
+          file_pattern: CHANGELOG.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body: ${{ steps.update_changelog.outputs.body }}
+          tag_name: ${{ github.ref_name }}
+          prerelease: contains(github.ref, '-beta') || contains(github.ref, '-rc')
+
+      - name: Publish to NPM
+        run: npm publish --access public
