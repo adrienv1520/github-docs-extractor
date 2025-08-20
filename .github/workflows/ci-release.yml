@@ -69,13 +69,12 @@ jobs:
       - name: Get previous tag
         id: previoustag
         run: |
-          PREVIOUS_TAG_COMMIT="$(git rev-list --tags --skip=1 --max-count=1)"
+          PREVIOUS_TAG="$(git tag --sort=-v:refname | head -n 2 | tail -n 1)"
 
-          if [ -z "$PREVIOUS_TAG_COMMIT" ]; then
+          if [ -z "$PREVIOUS_TAG" ]; then
             echo "tag=" >> $GITHUB_OUTPUT
           else
-            PREVIOUS_TAG_NAME=$(git describe --tags --abbrev=0 $PREVIOUS_TAG_COMMIT)
-            echo "tag=$PREVIOUS_TAG_NAME" >> $GITHUB_OUTPUT
+            echo "tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
           fi
 
       - name: Generate release notes content
