@@ -4,16 +4,16 @@ name: CI & Release
 
 on:
   push:
-    branches: [ "main" ]
-    tags:
-      - '*'
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+  release:
+    types: [published]
 
 jobs:
   ci:
     name: CI (Lint & Test)
-    if: "!startsWith(github.ref, 'refs/tags/')"
+    if: github.event_name != 'release'
     runs-on: ubuntu-latest
 
     steps:
@@ -38,7 +38,7 @@ jobs:
   release:
     name: Release & Publish
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'release'
 
     permissions:
       contents: write
@@ -62,16 +62,28 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Update package.json version
+        run: |
+          npm version ${{ github.event.release.tag_name }} --no-git-tag-version --allow-same-version
+
       - name: Get previous tag
         id: previoustag
-        uses: "ambactions/get-previous-tag@v1"
+        run: |
+          PREVIOUS_TAG_COMMIT="$(git rev-list --tags --skip=1 --max-count=1)"
+
+          if [ -z "$PREVIOUS_TAG_COMMIT" ]; then
+            echo "tag=" >> $GITHUB_OUTPUT
+          else
+            PREVIOUS_TAG_NAME=$(git describe --tags --abbrev=0 $PREVIOUS_TAG_COMMIT)
+            echo "tag=$PREVIOUS_TAG_NAME" >> $GITHUB_OUTPUT
+          fi
 
       - name: Generate release notes content
         id: changelog_content
         uses: mikepenz/release-changelog-builder-action@v4
         with:
           fromTag: ${{ steps.previoustag.outputs.tag }}
-          toTag: ${{ github.ref_name }}
+          toTag: ${{ github.event.release.tag_name }}
           configuration: "changelog-content-only-configuration.json"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -79,7 +91,7 @@ jobs:
       - name: Update CHANGELOG.md and set release body
         id: update_changelog
         run: |
-          CHANGELOG_HEADER="## v${{ github.ref_name }} - $(date +'%d/%m/%Y')"
+          CHANGELOG_HEADER="## v${{ github.event.release.tag_name }} - $(date +'%d/%m/%Y')"
           echo -e "${CHANGELOG_HEADER}\n" > new_entry.tmp
           echo "${{ steps.changelog_content.outputs.changelog }}" >> new_entry.tmp
 
@@ -98,18 +110,19 @@ jobs:
 
           rm new_entry.tmp old_body.tmp
 
-      - name: Commit updated CHANGELOG.md
+      - name: Commit release files
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore(release): update CHANGELOG.md for ${{ github.ref_name }}"
-          file_pattern: CHANGELOG.md
+          commit_message: "chore(release): bump version to v${{ github.event.release.tag_name }} and update CHANGELOG"
+          file_pattern: "package.json package-lock.json CHANGELOG.md"
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Update GitHub Release with changelog
+        uses: ncipollo/release-action@v1
         with:
+          allowUpdates: true
           body: ${{ steps.update_changelog.outputs.body }}
-          tag_name: ${{ github.ref_name }}
-          prerelease: contains(github.ref, '-beta') || contains(github.ref, '-rc')
+          tag: ${{ github.event.release.tag_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to NPM
         run: npm publish --access public
