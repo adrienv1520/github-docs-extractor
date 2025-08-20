@@ -23,6 +23,9 @@ A powerful and simple CLI tool to download `.md` and `.mdx` documentation files 
   <a href="https://www.npmjs.com/package/github-docs-extractor">
     <img src="https://img.shields.io/npm/v/github-docs-extractor.svg?style=flat&color=CC3534" alt="NPM Version">
   </a>
+  <a href="https://github.com/adrienv1520/github-docs-extractor/actions/workflows/ci-release.yml">
+    <img src="https://github.com/adrienv1520/github-docs-extractor/actions/workflows/ci-release.yml/badge.svg" alt="CI Status">
+  </a>
   <a href="https://www.npmjs.com/package/github-docs-extractor">
     <img src="https://img.shields.io/npm/dm/github-docs-extractor.svg?style=flat&color=30A8E6" alt="NPM Monthly Downloads">
   </a>
