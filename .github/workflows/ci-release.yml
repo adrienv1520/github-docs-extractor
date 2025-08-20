@@ -87,6 +87,7 @@ jobs:
           fromTag: ${{ steps.previoustag.outputs.tag }}
           toTag: ${{ github.event.release.tag_name }}
           configuration: "changelog-content-only-configuration.json"
+          fetchViaCommits: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -112,13 +113,6 @@ jobs:
 
           rm new_entry.tmp old_body.tmp
 
-      - name: Commit release files
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore(release): bump version to v${{ github.event.release.tag_name }} and update CHANGELOG"
-          file_pattern: "package.json package-lock.json CHANGELOG.md"
-          branch: main
-
       - name: Update GitHub Release with changelog
         uses: ncipollo/release-action@v1
         with:
@@ -129,3 +123,10 @@ jobs:
 
       - name: Publish to NPM
         run: npm publish --access public
+
+      - name: Commit release files
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(release): bump version to v${{ github.event.release.tag_name }} and update CHANGELOG"
+          file_pattern: "package.json package-lock.json CHANGELOG.md"
+          branch: main
