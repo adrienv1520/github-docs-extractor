@@ -1,6 +1,6 @@
 {
   "name": "github-docs-extractor",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "author": "Adrien Valcke <adrienvalcke@icloud.com> (https://github.com/adrienv1520)",
   "description": "A CLI tool to download .md and .mdx files from a GitHub repository.",
   "type": "module",
