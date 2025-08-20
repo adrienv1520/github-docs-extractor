@@ -13,25 +13,14 @@
   - [Examples](#examples)
 - [Avoiding API Rate Limits](#avoiding-api-rate-limits)
 - [Best Practices for AI RAG](#best-practices-for-ai-rag)
-    - [1. Prefer Multiple, Small Files over a Single Large File](#1-prefer-multiple-small-files-over-a-single-large-file)
-    - [2. Filenames are Important Metadata](#2-filenames-are-important-metadata)
-    - [3. Clean and Standard Markdown](#3-clean-and-standard-markdown)
+  - [1. Prefer Multiple, Small Files over a Single Large File](#1-prefer-multiple-small-files-over-a-single-large-file)
+  - [2. Filenames are Important Metadata](#2-filenames-are-important-metadata)
+  - [3. Clean and Standard Markdown](#3-clean-and-standard-markdown)
 
 A powerful and simple CLI tool to download `.md` and `.mdx` documentation files from any public **or private** GitHub repository. It prepares the files for optimal use in AI and Retrieval-Augmented Generation (RAG) systems by flattening the directory structure into descriptive filenames.
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/github-docs-extractor">
-    <img src="https://img.shields.io/npm/v/github-docs-extractor.svg?style=flat&color=CC3534" alt="NPM Version">
-  </a>
-  <a href="https://github.com/adrienv1520/github-docs-extractor/actions/workflows/ci-release.yml">
-    <img src="https://github.com/adrienv1520/github-docs-extractor/actions/workflows/ci-release.yml/badge.svg" alt="CI Status">
-  </a>
-  <a href="https://www.npmjs.com/package/github-docs-extractor">
-    <img src="https://img.shields.io/npm/dm/github-docs-extractor.svg?style=flat&color=30A8E6" alt="NPM Monthly Downloads">
-  </a>
-  <a href="https://opensource.org/licenses/MIT">
-    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
-  </a>
+  <!-- CI Status --><a href="https://github.com/adrienv1520/github-docs-extractor/actions/workflows/ci-release.yml"><img src="https://github.com/adrienv1520/github-docs-extractor/actions/workflows/ci-release.yml/badge.svg" alt="CI Status"></a><!-- NPM Version --><a href="https://www.npmjs.com/package/github-docs-extractor"><img src="https://img.shields.io/npm/v/github-docs-extractor.svg?style=flat&color=CC3534" alt="NPM Version"></a><!-- NPM Monthly Downloads --><a href="https://www.npmjs.com/package/github-docs-extractor"><img src="https://img.shields.io/npm/dm/github-docs-extractor.svg?style=flat&color=30A8E6" alt="NPM Monthly Downloads"></a><!-- License --><a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
 ## Why?
@@ -173,15 +162,15 @@ This tool can make many requests for large repositories. To avoid hitting the lo
 
 The design of this tool is guided by these principles for preparing documents for Retrieval-Augmented Generation (RAG) systems:
 
-#### 1. Prefer Multiple, Small Files over a Single Large File
+### 1. Prefer Multiple, Small Files over a Single Large File
 
 RAG systems work by finding the most relevant "chunks" of text to answer a query. When you provide many small, topically-focused files, you make it easier for the system to find the exact document it needs. This reduces noise and improves the accuracy of the context provided to the AI model.
 
-#### 2. Filenames are Important Metadata
+### 2. Filenames are Important Metadata
 
 A file named `api-reference-hooks-use-state.md` provides strong, immediate context. The RAG system can infer from the name alone that this document is highly relevant for a question about the `useState` hook. This tool's flattening strategy (`folder/file.md` -> `folder-file.md`) is designed to preserve this valuable contextual information.
 
-#### 3. Clean and Standard Markdown
+### 3. Clean and Standard Markdown
 
 Ensure the source documentation uses clean, standard Markdown. Complex or non-standard syntax can be misinterpreted by document loaders and chunking algorithms. This tool fetches the raw content, preserving the original structure for maximum compatibility.
 
