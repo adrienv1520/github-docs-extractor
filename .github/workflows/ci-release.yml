@@ -87,7 +87,7 @@ jobs:
           fromTag: ${{ steps.previoustag.outputs.tag }}
           toTag: ${{ github.event.release.tag_name }}
           configuration: "changelog-content-only-configuration.json"
-          fetchViaCommits: true
+          mode: "COMMIT"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
