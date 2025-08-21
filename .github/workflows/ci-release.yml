@@ -82,12 +82,28 @@ jobs:
 
       - name: Generate release notes content
         id: changelog_content
-        uses: mikepenz/release-changelog-builder-action@v4
+        uses: mikepenz/release-changelog-builder-action@v5
         with:
           fromTag: ${{ steps.previoustag.outputs.tag }}
           toTag: ${{ github.event.release.tag_name }}
-          configuration: "changelog-content-only-configuration.json"
           mode: "COMMIT"
+          configurationJson: |
+            {
+              "categories": [
+                { "title": "## ✨ Features", "labels": ["feat", "feature"] },
+                { "title": "## 🐞 Bug Fixes", "labels": ["fix", "bug"] },
+                { "title": "## 🐛 Maintenance", "labels": ["chore", "ci", "build", "docs", "refactor", "test", "style"] }
+              ],
+              "template": "#{{CATEGORIES}}",
+              "pr_template": "- #{{TITLE}}",
+              "empty_template": "- No significant changes in this release.",
+              "label_extractor": [
+                {
+                  "pattern": "^(feat|feature|fix|bug|chore|ci|build|docs|refactor|test|style)(\\([\\w\\-\\.]+\\))?(!)?:",
+                  "target": "$1"
+                }
+              ]
+            }
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
