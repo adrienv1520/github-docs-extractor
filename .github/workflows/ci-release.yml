@@ -89,17 +89,17 @@ jobs:
           mode: "COMMIT"
           configurationJson: |
             {
+              "template": "#{{CHANGELOG}}",
               "categories": [
                 { "title": "## ✨ Features", "labels": ["feat", "feature"] },
-                { "title": "## 🐞 Bug Fixes", "labels": ["fix", "bug"] },
-                { "title": "## 🐛 Maintenance", "labels": ["chore", "ci", "build", "docs", "refactor", "test", "style"] }
+                { "title": "## 🐞 Fixes", "labels": ["bug", "fix"] },
+                { "title": "## 🐛 Maintenance", "labels": ["build", "chore", "ci", "docs", "refactor", "style", "test"] }
+                { "title": "## 🫣 Other", "labels": [] }
               ],
-              "template": "#{{CATEGORIES}}",
-              "pr_template": "- #{{TITLE}}",
-              "empty_template": "- No significant changes in this release.",
               "label_extractor": [
                 {
-                  "pattern": "^(feat|feature|fix|bug|chore|ci|build|docs|refactor|test|style)(\\([\\w\\-\\.]+\\))?(!)?:",
+                  "pattern": "^(build|bug|chore|ci|docs|feat|feature|fix|perf|refactor|revert|style|test){1}(\\([\\w\\-\\.]+\\))?(!)?: ([\\w ])+([\\s\\S]*)",
+                  "on_property": "title",
                   "target": "$1"
                 }
               ]
