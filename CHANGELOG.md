@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.0.6 - 21/08/2025
+
+## 💄 Maintenance
+
+- chore(release): bump version to v1.0.5 and update CHANGELOG
+- ci: change emoji for maintenance category in generated changelog
+
+
+
+
 ## v1.0.5 - 21/08/2025
 
 ## 🐞 Fixes
