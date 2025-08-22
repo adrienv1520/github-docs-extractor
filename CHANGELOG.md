@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.0.7 - 22/08/2025
+
+## 💄 Maintenance
+
+- chore(release): bump version to v1.0.6 and update CHANGELOG
+- docs(readme): fix badges
+- docs(readme): fix badges to be centered
+
+
+
+
 ## v1.0.6 - 21/08/2025
 
 ## 💄 Maintenance
