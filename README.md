@@ -19,7 +19,7 @@
 
 A powerful and simple CLI tool to download `.md` and `.mdx` documentation files from any public **or private** GitHub repository. It prepares the files for optimal use in AI and Retrieval-Augmented Generation (RAG) systems by flattening the directory structure into descriptive filenames.
 
-<div style="text-align: center">
+<div align="center">
 
   [![NPM Version](https://img.shields.io/npm/v/github-docs-extractor.svg?style=flat&color=CC3534)](https://www.npmjs.com/package/github-docs-extractor)
   &nbsp;[![NPM Monthly Downloads](https://img.shields.io/npm/dm/github-docs-extractor.svg?style=flat&color=30A8E6)](https://www.npmjs.com/package/github-docs-extractor)
