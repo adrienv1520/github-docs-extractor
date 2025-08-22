@@ -19,9 +19,15 @@
 
 A powerful and simple CLI tool to download `.md` and `.mdx` documentation files from any public **or private** GitHub repository. It prepares the files for optimal use in AI and Retrieval-Augmented Generation (RAG) systems by flattening the directory structure into descriptive filenames.
 
-<p align="center">
-  <!-- CI Status --><a href="https://github.com/adrienv1520/github-docs-extractor/actions/workflows/ci-release.yml"><img src="https://github.com/adrienv1520/github-docs-extractor/actions/workflows/ci-release.yml/badge.svg" alt="CI Status"></a>&nbsp;&nbsp;<!-- NPM Version --><a href="https://www.npmjs.com/package/github-docs-extractor"><img src="https://img.shields.io/npm/v/github-docs-extractor.svg?style=flat&color=CC3534" alt="NPM Version"></a>&nbsp;&nbsp;<!-- NPM Monthly Downloads --><a href="https://www.npmjs.com/package/github-docs-extractor"><img src="https://img.shields.io/npm/dm/github-docs-extractor.svg?style=flat&color=30A8E6" alt="NPM Monthly Downloads"></a>&nbsp;&nbsp;<!-- License --><a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
-</p>
+<div style="text-align: center">
+
+  [![NPM Version](https://img.shields.io/npm/v/github-docs-extractor.svg?style=flat&color=CC3534)](https://www.npmjs.com/package/github-docs-extractor)
+  &nbsp;[![NPM Monthly Downloads](https://img.shields.io/npm/dm/github-docs-extractor.svg?style=flat&color=30A8E6)](https://www.npmjs.com/package/github-docs-extractor)
+  &nbsp;[![CI Status](https://github.com/adrienv1520/github-docs-extractor/actions/workflows/ci-release.yml/badge.svg)](https://github.com/adrienv1520/github-docs-extractor/actions/workflows/ci-release.yml)
+  &nbsp;[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  &nbsp;[![GitHub Stars](https://img.shields.io/github/stars/adrienv1520/github-docs-extractor?style=social)](https://github.com/adrienv1520/github-docs-extractor)
+
+</div>
 
 ## Why?
 
