@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.1.0 - 18/12/2025
+
+## ✨ Features
+
+- feat(cli): flatten documentation paths into a deterministic, Claude-friendly output structure
+
+## 🐞 Fixes
+
+- fix(ci): fix npm token, removed Trusted Publishing attempt
+
+## 💄 Maintenance
+
+- chore(release): bump version to v1.0.7 and update CHANGELOG
+
+## 🫣 Other
+
+- Merge branch 'main' of github.com:adrienv1520/github-docs-extractor
+
+
+
+
 ## v1.0.7 - 22/08/2025
 
 ## 💄 Maintenance
