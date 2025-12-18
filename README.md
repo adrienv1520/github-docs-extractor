@@ -7,17 +7,20 @@
 
 - [Why?](#why)
 - [Features](#features)
+- [Output Structure \& Naming Rules](#output-structure--naming-rules)
+  - [1. One-level directory structure](#1-one-level-directory-structure)
+  - [2. Filenames encode the full relative path](#2-filenames-encode-the-full-relative-path)
+  - [3. Output directory names are included in filenames](#3-output-directory-names-are-included-in-filenames)
+  - [4. Duplicate segments are avoided](#4-duplicate-segments-are-avoided)
 - [Installation](#installation)
 - [Usage](#usage)
   - [Options](#options)
   - [Examples](#examples)
 - [Avoiding API Rate Limits](#avoiding-api-rate-limits)
-- [Best Practices for AI RAG](#best-practices-for-ai-rag)
-  - [1. Prefer Multiple, Small Files over a Single Large File](#1-prefer-multiple-small-files-over-a-single-large-file)
-  - [2. Filenames are Important Metadata](#2-filenames-are-important-metadata)
-  - [3. Clean and Standard Markdown](#3-clean-and-standard-markdown)
+- [Best Practices for Claude \& AI Projects](#best-practices-for-claude--ai-projects)
+- [License](#license)
 
-A powerful and simple CLI tool to download `.md` and `.mdx` documentation files from any public **or private** GitHub repository. It prepares the files for optimal use in AI and Retrieval-Augmented Generation (RAG) systems by flattening the directory structure into descriptive filenames.
+A powerful and simple CLI tool to download `.md` and `.mdx` documentation files from any public **or private** GitHub repository. It prepares the files for optimal use in **Claude Projects**, AI assistants, and Retrieval-Augmented Generation (RAG) systems by extracting documentation into a clean, predictable, and AI-friendly structure.
 
 <div align="center">
 
@@ -29,33 +32,133 @@ A powerful and simple CLI tool to download `.md` and `.mdx` documentation files 
 
 </div>
 
+---
+
 ## Why?
 
-When using AI models like Claude or building RAG systems with frameworks like LlamaIndex or LangChain, providing well-structured, context-rich documents is crucial. A collection of small, descriptively named files is far more effective than a single massive document. This tool automates the process of fetching and preparing these files.
+When using AI models like **Claude** or building RAG systems, the **structure and naming of your documents matter as much as the content itself**. Flattening folder structures while preserving semantic context in filenames
+is critical for high-quality document retrieval.
+
+Claude performs best when:
+
+- Documents are **logically grouped**
+- Files are **small, focused, and descriptively named**
+- Folder depth is **shallow and intentional**
+
+`github-docs-extractor` automates the extraction of GitHub documentation so it can be uploaded directly into a Claude Project or AI knowledge base with minimal manual cleanup.
 
 ---
 
 ## Features
 
 - **Targeted Extraction**: Pull docs from one or more specific folders in a repository.
-- **Smart Filenaming**: Converts the original folder structure `docs/getting-started/installation.md` into a flat, descriptive filename like `prefix-docs-getting-started-installation.md`.
-- **AI-Ready**: The output is perfect for direct ingestion into AI projects like Claude, Perplexity, or custom RAG pipelines.
-- **ZIP Archiving**: Optionally create a single `.zip` file for easy uploading to AI platforms.
-- **User-Friendly CLI**: Interactive spinners and colored output for a great user experience.
-- **Alias Support**: Use the shorter `gde` command for convenience.
-- **Works with Private Repositories**: The tool seamlessly works with private repositories. To access them, you need to provide a GitHub Personal Access Token. See [Avoiding API Rate Limits](#avoiding-api-rate-limits).
+- **Claude-Ready Output**: Produces a structure aligned with Claude Project best practices.
+- **Smart Filenaming**: Generates descriptive, human-readable filenames.
+- **Deterministic Filenaming**: Filenames always encode the original documentation path to preserve context.
+- **Category-Friendly**: Designed to work naturally with one-level subfolder organization.
+- **ZIP Archiving**: Optionally create a single `.zip` file for easy upload to AI platforms.
+- **User-Friendly CLI**: Interactive spinners and colored output.
+- **Alias Support**: Use the shorter `gde` command.
+- **Works with Private Repositories**: Supports GitHub Personal Access Tokens (PAT). See [Avoiding API Rate Limits](#avoiding-api-rate-limits).
+
+---
+
+## Output Structure & Naming Rules
+
+This tool intentionally flattens documentation structures to make them
+optimal for AI ingestion (Claude Projects, RAG systems, etc.).
+
+The output always follows **deterministic and predictable rules** designed to
+preserve semantic context while avoiding deep folder hierarchies.
+
+---
+
+### 1. One-level directory structure
+
+All extracted files are written into a **single output directory level**.
+
+The name of this directory is derived from the documentation path provided
+using the `--paths` option.
+
+| `--paths` value | Output directory |
+|-----------------|------------------|
+| `docs` | `output/` |
+| `packages/react/docs` | `output/react-docs/` |
+| `examples/with-mdx` | `output/examples-with-mdx/` |
+| `docs/code` | `output/code/` |
+
+Documentation container names such as `docs`, `doc`, and `documentation`
+are treated as neutral and are ignored when computing the output directory name.
+
+---
+
+### 2. Filenames encode the full relative path
+
+To preserve context after flattening, **filenames always encode the full
+relative path under the documentation root**.
+
+This ensures that no semantic information is lost, even when multiple files
+share the same base name.
+
+**Example input structure:**
+
+```text
+docs/
+└── code/
+    ├── api.md
+    └── api/
+        └── api.md
+```
+
+**Extracted output**:
+
+```text
+output/code/
+├── code-api.md
+└── code-api-api.md
+```
+
+Each folder name under the documentation path becomes part of the filename,
+joined using hyphens (`-`).
+
+---
+
+### 3. Output directory names are included in filenames
+
+When an output directory exists, its name is always included as the first
+segment of the filename.
+
+Example:
+
+```shell
+--paths docs/code
+```
+
+`docs/code/get-started.md` will be saved at `output/code/code-get-started.md`
+
+This guarantees that filenames remain self-descriptive and retain their
+categorical context even when uploaded into flat or semi-flat systems.
+
+---
+
+### 4. Duplicate segments are avoided
+
+If a filename already starts with the expected prefix, it will not be duplicated.
+
+This prevents redundant or unreadable filenames while keeping the naming
+rules fully deterministic.
 
 ---
 
 ## Installation
 
-You can install the tool globally via npm to use it anywhere:
+Install globally via `npm`:
 
 ```bash
 npm install -g github-docs-extractor
 ```
 
-Alternatively, you can run it directly without installation using `npx`:
+Or run directly using `npx`:
 
 ```bash
 npx github-docs-extractor --repo <url> ...
@@ -75,25 +178,24 @@ _You can also use the full name `github-docs-extractor`._
 
 ### Options
 
-| Option                | Alias | Description                                                                   | Default    |
-| --------------------- | ----- | ----------------------------------------------------------------------------- | ---------- |
-| `--repo <url>`        | `-r`  | **Required.** The full URL of the GitHub repository.                           |            |
-| `--paths <paths...>`  | `-p`  | One or more space-separated paths to the documentation folders in the repo.     | `docs`     |
-| `--out <dir>`         | `-o`  | The destination directory for the downloaded files.                           | `./output` |
-| `--prefix <prefix>`   |       | An optional prefix to add to every downloaded filename.                       |            |
-| `--zip`               |       | If set, creates a zip archive of the output folder.                           | `false`    |
-| `--version`              | `-V`  | Display the version menu.                                                        |            |
-| `--help`              | `-h`  | Display the help menu.                                                        |            |
+| Option | Alias | Description | Default |
+| ------ | ----- | ----------- | ------- |
+| `--repo <url>` | `-r` | **Required.** The full URL of the GitHub repository. |  |
+| `--paths <paths...>` | `-p` | One or more space-separated paths to the documentation folders in the repo. | `docs` |
+| `--out <dir>` | `-o` | The destination directory for the downloaded files. | `./output` |
+| `--zip` |  | If set, creates a zip archive of the output folder. | `false` |
+| `--version` | `-V` | Display the version menu. |  |
+| `--help` | `-h` | Display the help menu. |  |
 
 ### Examples
 
 **1. Basic Usage (extracting the default `docs` folder)**
 
 ```bash
-gde --repo "https://github.com/vuejs/docs"
+gde --repo "https://github.com/adrienv1520/claude-master"
 ```
 
-This will download all markdown files from the `docs/` folder of the Vue.js documentation repository into a local `./output` directory.
+This will download all markdown files from the `docs/` folder of the Claude Master documentation repository into a local `./output` directory with only one subfolder level.
 
 **2. Specifying a custom path and output directory**
 
@@ -101,23 +203,21 @@ This will download all markdown files from the `docs/` folder of the Vue.js docu
 gde -r "https://github.com/facebook/react" -p "packages/react-dom/docs" -o "./react-dom-docs"
 ```
 
-This extracts only the docs related to `react-dom` and saves them in `./react-dom-docs`.
+This extracts only the docs related to `react-dom` and saves them in `./react-dom-docs` with only one subfolder level if there was any.
 
-**3. Using a prefix and multiple paths**
+**3. Using a multiple paths**
 
 ```bash
 gde \
   --repo "https://github.com/vercel/next.js" \
   --paths docs examples/with-mdx \
-  --prefix "nextjs" \
   --out "./nextjs-docs"
 ```
 
 This will:
 
 - Fetch files from both `docs/` and `examples/with-mdx/`.
-- Save them in `./nextjs-docs`.
-- Prefix every filename with `nextjs-` (e.g., `nextjs-docs-01-getting-started.mdx`).
+- Save them in `./nextjs-docs` with only one subfolder level if there was any.
 
 **4. Creating a ZIP archive**
 
@@ -125,7 +225,6 @@ This will:
 gde \
   --repo "https://github.com/mdn/content" \
   --paths "files/en-us/web/javascript" \
-  --prefix "mdn-js" \
   --out "./mdn-javascript" \
   --zip
 ```
@@ -146,7 +245,7 @@ This tool can make many requests for large repositories. To avoid hitting the lo
 **How to Use a Personal Access Token**:
 
 1. **[Create a new Personal Access Token](https://github.com/settings/tokens/new)** on GitHub (the "classic" version is fine).
-    - For accessing **public repos**, no special scopes/permissions are needed.
+    - For accessing **public repos**, grant the `repo/public_repo` scope.
     - For accessing **private repos**, grant the `repo` scope.
 
 2. **Set it as an environment variable** named `GITHUB_TOKEN` before running the command. The CLI will automatically detect and use it.
@@ -164,20 +263,14 @@ This tool can make many requests for large repositories. To avoid hitting the lo
 
 ---
 
-## Best Practices for AI RAG
+## Best Practices for Claude & AI Projects
 
-The design of this tool is guided by these principles for preparing documents for Retrieval-Augmented Generation (RAG) systems:
+This repository is aligned with Claude's own recommendations you can find here: [Claude Master](https://github.com/adrienv1520/claude-master?tab=readme-ov-file#best-practices-for-claude-project-knowledge-bases).
 
-### 1. Prefer Multiple, Small Files over a Single Large File
+---
 
-RAG systems work by finding the most relevant "chunks" of text to answer a query. When you provide many small, topically-focused files, you make it easier for the system to find the exact document it needs. This reduces noise and improves the accuracy of the context provided to the AI model.
+By using `github-docs-extractor`, you are aligning your documentation with Claude’s native strengths, resulting in better search, better context selection, and better answers.
 
-### 2. Filenames are Important Metadata
+## License
 
-A file named `api-reference-hooks-use-state.md` provides strong, immediate context. The RAG system can infer from the name alone that this document is highly relevant for a question about the `useState` hook. This tool's flattening strategy (`folder/file.md` -> `folder-file.md`) is designed to preserve this valuable contextual information.
-
-### 3. Clean and Standard Markdown
-
-Ensure the source documentation uses clean, standard Markdown. Complex or non-standard syntax can be misinterpreted by document loaders and chunking algorithms. This tool fetches the raw content, preserving the original structure for maximum compatibility.
-
-By using `github-docs-extractor`, you are already applying these best practices automatically, significantly improving the quality of your source material for any AI application.
+[MIT](LICENSE.md).

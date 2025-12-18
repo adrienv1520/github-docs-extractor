@@ -32,7 +32,8 @@ export default [
       ...pluginN.configs['flat/recommended'].rules,
       ...pluginUnicorn.configs.recommended.rules,
       // Enforce strict equality checks (=== and !==)
-      eqeqeq: ['error', 'always'],
+      'eqeqeq': ['error', 'always'],
+      'n/no-unpublished-import': 'off',
     },
   },
 

@@ -11,16 +11,141 @@ import ora from 'ora';
 
 import packageJson from '../package.json' with { type: 'json' };
 
-/* eslint-disable n/no-unpublished-import */
 import ascii from './ascii.js';
 import utilities from './utilities.js';
-/* eslint-enable n/no-unpublished-import */
 
 // Initialize GitHub API client (Octokit).
 // It automatically uses the GITHUB_TOKEN environment variable if set,
 // which is perfect for accessing private repositories or
 // increasing API rate limits.
-const octokit = new Octokit();
+const octokit = new Octokit({
+  auth: process.env.GITHUB_TOKEN || undefined,
+});
+
+const DEFAULT_DOCS_PATH = 'docs';
+const DEFAULT_OUTPUT_DIRECTORY_PATH = './output';
+const DEFAULT_TO_ZIP = false;
+const DOC_CONTAINER_NAMES = new Set(['doc', 'docs', 'documentation']);
+
+/**
+ * Builds the final output directory and filename using Claude-friendly
+ * flattening and naming rules.
+ *
+ * Design principles:
+ * - The output directory structure is limited to a single level.
+ * - The output directory (outputRoot) is derived from the documentation path.
+ * - The filename always encodes the full relative path under the documentation root.
+ * - The output directory name is always included in the filename when present.
+ * - Duplicate path segments in filenames are avoided.
+ *
+ * @param {string} filePath
+ *   Full file path in the GitHub repository
+ *   (e.g. "packages/react/docs/api/hooks.md").
+ *
+ * @param {string} documentPath
+ *   Documentation root path explicitly provided via the --paths option.
+ *   This path is used as the reference point for flattening
+ *   (e.g. "packages/react/docs", "docs", "examples/with-mdx").
+ *
+ * @param {string|undefined} outputRoot
+ *   Computed top-level output directory name derived from documentPath.
+ *   When undefined, files are written directly to the root output directory
+ *   and no directory prefix is added to filenames.
+ *
+ * @param {string} outputDirectory
+ *   Absolute or relative path to the base output directory.
+ *
+ * @returns {{ directory: string, filename: string }}
+ *   directory:
+ *     Final directory where the file must be written.
+ *   filename:
+ *     Final filename including all flattened path segments.
+ */
+function buildOutputLocation(filePath, documentPath, outputRoot, outputDirectory) {
+  const normalized = filePath.replaceAll('\\', '/');
+  const relativePath = normalized.startsWith(`${documentPath}/`)
+    ? normalized.slice(documentPath.length + 1)
+    : normalized;
+  const parts = relativePath.split('/');
+  const filename = parts.pop();
+  const prefixParts = [];
+
+  if (outputRoot) {
+    prefixParts.push(outputRoot);
+  }
+
+  if (parts.length > 0 && !(outputRoot && parts[0] === outputRoot)) {
+    prefixParts.push(...parts);
+  }
+
+  const folderPrefix = prefixParts.length > 0
+    ? `${prefixParts.join('-')}-`
+    : '';
+  const finalFilename = filename.startsWith(folderPrefix)
+    ? filename
+    : `${folderPrefix}${filename}`;
+  const directory = outputRoot
+    ? path.join(outputDirectory, outputRoot)
+    : outputDirectory;
+
+  return { directory, filename: finalFilename };
+}
+
+/**
+ * Computes the top-level output directory name from a documentation path.
+ *
+ * This function applies deterministic naming rules to avoid directory
+ * collisions and preserve semantic context when flattening documentation
+ * structures.
+ *
+ * Rules:
+ * - If the path is a single segment:
+ *   - If it is a documentation container ("docs", "doc", "documentation"),
+ *     files are written to the root output directory (returns undefined).
+ *   - Otherwise, the segment itself becomes the output directory name.
+ *
+ * - If the path has multiple segments:
+ *   - If the first segment is a documentation container, it is ignored.
+ *   - If only one segment remains, it becomes the output directory name.
+ *   - Otherwise, the last two segments are joined with a dash
+ *     to form the output directory name.
+ *
+ * Examples:
+ * - "docs"                     → undefined
+ * - "docs/code"                → "code"
+ * - "docs/code/docs"           → "code-docs"
+ * - "packages/react/docs"      → "react-docs"
+ * - "react/three/docs"         → "three-docs"
+ * - "react/three/docs/v1"      → "docs-v1"
+ * - "examples/with-mdx"        → "examples-with-mdx"
+ * - "help"                     → "help"
+ *
+ * @param {string} documentPath
+ *   A documentation path provided via the --paths option
+ *   (e.g. "packages/react/docs", "docs", "examples/with-mdx").
+ *
+ * @returns {string|undefined}
+ *   The computed output root directory name.
+ *   If undefined, files should be written directly to the output root.
+ */
+function computeOutputRoot(documentPath) {
+  const segments = documentPath.split('/').filter(Boolean);
+
+  if (segments.length === 1) {
+    return DOC_CONTAINER_NAMES.has(segments[0]) ? undefined : segments[0];
+  }
+
+  const effectiveSegments = DOC_CONTAINER_NAMES.has(segments[0])
+    ? segments.slice(1)
+    : segments;
+
+  if (effectiveSegments.length === 1) {
+    return effectiveSegments[0];
+  }
+
+  const lastTwo = effectiveSegments.slice(-2);
+  return lastTwo.join('-');
+}
 
 /**
  * Creates a zip archive from a source directory.
@@ -55,41 +180,62 @@ async function extract(options) {
   const repoInfo = parseRepoUrl(options.repo);
   const { owner, repo } = repoInfo;
   const documentPaths = Array.isArray(options.paths) ? options.paths : [options.paths];
+  const pathConfigs = documentPaths.map((documentPath) => ({
+    documentPath,
+    outputRoot: computeOutputRoot(documentPath),
+  }));
+
   const spinner = ora(`Fetching file list from ${chalk.green(`${owner}/${repo}`)}...`).start();
   const allFilesToDownload = [];
 
   try {
     // 2. Fetch file lists from all specified paths.
-    for (const documentPath of documentPaths) {
+    for (const { documentPath, outputRoot } of pathConfigs) {
       spinner.text = `Fetching files from ${chalk.green(`${owner}/${repo}/${documentPath}`)}...`;
       const filesInPath = await fetchAllFiles(owner, repo, documentPath);
-      allFilesToDownload.push(...filesInPath);
+
+      allFilesToDownload.push(
+        ...filesInPath.map((file) => ({
+          ...file,
+          __documentPath: documentPath,
+          __outputRoot: outputRoot,
+        })),
+      );
     }
 
     if (allFilesToDownload.length === 0) {
       spinner.warn(chalk.yellow('No .md or .mdx files found in any of the specified paths.'));
       return;
     }
+
     spinner.succeed(chalk.green(`Found ${allFilesToDownload.length} files to download.`));
 
     // 3. Prepare the output directory.
-    await fs.emptyDir(options.out); // fs-extra ensures the directory is empty. It will be created if it doesn't exist.
+    await fs.emptyDir(options.out);
 
     /* eslint-disable-next-line security-node/detect-crlf */
     console.log(chalk.blueBright(`Output directory cleaned. Files will be saved to: ${path.resolve(options.out)}`));
 
     // 4. Download each file.
     const downloadSpinner = ora('Downloading files...').start();
+
     for (const file of allFilesToDownload) {
       downloadSpinner.text = `Downloading ${chalk.cyan(file.path)}`;
+
       const { data: fileContent } = await octokit.repos.getContent({ owner, path: file.path, repo });
       const content = Buffer.from(fileContent.content, 'base64').toString('utf8');
-      const flattenedName = file.path.replaceAll(/[/\\]/g, '-');
-      const newFilename = `${options.prefix ? `${options.prefix}-` : ''}${flattenedName}`;
-      const outputPath = path.join(options.out, newFilename);
 
-      await fs.writeFile(outputPath, content);
+      const { directory, filename } = buildOutputLocation(
+        file.path,
+        file.__documentPath,
+        file.__outputRoot,
+        options.out,
+      );
+
+      await fs.ensureDir(directory);
+      await fs.writeFile(path.join(directory, filename), content);
     }
+
     downloadSpinner.succeed(chalk.green('All files downloaded successfully.'));
 
     // 5. Optionally create a zip archive.
@@ -109,6 +255,7 @@ async function extract(options) {
   catch (error) {
     spinner.fail(chalk.red.bold('An error occurred:'));
     console.error(chalk.red(error.message));
+
     if (error.status === 403) {
       console.error(chalk.yellow.bold('\n🙀 API Rate Limit Exceeded'));
       /* eslint-disable @stylistic/max-len */
@@ -116,6 +263,7 @@ async function extract(options) {
       console.error(chalk.yellow('To fix this, create a Personal Access Token (PAT) and set it as an environment variable:'));
       console.error(chalk.cyan('  export GITHUB_TOKEN="your_token_here"'));
       console.error(chalk.yellow('This will increase your limit to 5,000 requests/hour and is recommended for all uses.'));
+      console.error(chalk.yellow('See the documentation of this CLI for a detailed procedure to follow.'));
       /* eslint-enable @stylistic/max-len */
     }
 
@@ -145,6 +293,7 @@ async function fetchAllFiles(owner, repo, directoryPath) {
         files.push(item);
       }
     }
+
     return files;
   }
   catch (error) {
@@ -173,10 +322,9 @@ function launchCLI(argv) {
       .name(`gde (${packageJson.name})`)
       .description(chalk.cyan.bold(`  ${packageJson.description}`))
       .requiredOption('-r, --repo <url>', `GitHub repository URL (e.g., https://github.com/facebook/react) (${chalk.bold('required')})`)
-      .option('-o, --out <dir>', 'Destination directory for downloaded files', './output')
-      .option('-p, --paths <paths...>', 'One or more space-separated paths to documentation folders', 'docs')
-      .option('--prefix <prefix>', 'Prefix to add to each downloaded filename', '')
-      .option('--zip', 'Create a zip archive of the output directory', false)
+      .option('-o, --out <dir>', 'Destination directory for downloaded files', DEFAULT_OUTPUT_DIRECTORY_PATH)
+      .option('-p, --paths <paths...>', 'One or more space-separated paths to documentation folders', DEFAULT_DOCS_PATH)
+      .option('--zip', 'Create a zip archive of the output directory', DEFAULT_TO_ZIP)
       .version(`v${packageJson.version}`);
 
     if (argv?.length <= 2) {
@@ -200,18 +348,22 @@ function launchCLI(argv) {
  * @throws {Error} If the URL is invalid.
  */
 function parseRepoUrl(url) {
-  // HTTPS URL: https://github.com/owner/repo.git or https://github.com/owner/repo
-  let match = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)(?:\.git)?$/i);
+  // HTTPS URL:
+  // - https://github.com/owner/repo
+  // - https://github.com/owner/repo/
+  // - https://github.com/owner/repo.git
+  let match = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/i);
 
-  // SSH URL: git@github.com:owner/repo.git
+  // SSH URL:
+  // - git@github.com:owner/repo.git
+  // - git@github.com:owner/repo
   if (!match) {
-    match = url.match(/^git@github\.com:([^/]+)\/([^/]+)(?:\.git)?$/i);
+    match = url.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/i);
   }
 
   if (!match || !match[1] || !match[2]) {
     const errorMessage = 'Invalid GitHub repository URL. Expected format: https://github.com/owner/repo or git@github.com:owner/repo.git';
     console.error(chalk.red.bold(errorMessage));
-
     throw new Error(errorMessage);
   }
 
@@ -244,7 +396,12 @@ if (utilities.isMainModule(import.meta.url)) {
 
 // Export functions for testing purposes.
 export default {
+  buildOutputLocation,
+  computeOutputRoot,
   createZipArchive,
+  DEFAULT_DOCS_PATH,
+  DEFAULT_OUTPUT_DIRECTORY_PATH,
+  DEFAULT_TO_ZIP,
   extract,
   fetchAllFiles,
   launchCLI,

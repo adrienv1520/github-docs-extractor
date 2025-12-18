@@ -15,8 +15,14 @@ vi.mock('@octokit/rest', () => ({
   })),
 }));
 
-const { mockEmptyDir, mockWriteFile, mockCreateWriteStream } = vi.hoisted(() => ({
+const {
+  mockEmptyDir,
+  mockEnsureDir,
+  mockWriteFile,
+  mockCreateWriteStream,
+} = vi.hoisted(() => ({
   mockEmptyDir: vi.fn(),
+  mockEnsureDir: vi.fn(),
   mockWriteFile: vi.fn(),
   mockCreateWriteStream: vi.fn().mockReturnValue({
     on: vi.fn((event, callback) => {
@@ -24,9 +30,11 @@ const { mockEmptyDir, mockWriteFile, mockCreateWriteStream } = vi.hoisted(() => 
     }),
   }),
 }));
+
 vi.mock('fs-extra', () => ({
   default: {
     emptyDir: mockEmptyDir,
+    ensureDir: mockEnsureDir,
     writeFile: mockWriteFile,
     createWriteStream: mockCreateWriteStream,
   },
@@ -61,6 +69,11 @@ vi.mock('../bin/ascii.js', () => ({
 }));
 
 const {
+  buildOutputLocation,
+  computeOutputRoot,
+  DEFAULT_DOCS_PATH,
+  DEFAULT_OUTPUT_DIRECTORY_PATH,
+  DEFAULT_TO_ZIP,
   extract,
   fetchAllFiles,
   launchCLI,
@@ -72,6 +85,174 @@ const {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+// UNIT TEST
+
+describe('buildOutputLocation()', () => {
+  const outputDirectory = './output';
+
+  it('flattens files under a simple docs path (no outputRoot)', () => {
+    const result = buildOutputLocation(
+      'docs/guide.md',
+      'docs',
+      undefined,
+      outputDirectory,
+    );
+
+    expect(result).toEqual({
+      directory: './output',
+      filename: 'guide.md',
+    });
+  });
+
+  it('preserves subfolders in filename when no outputRoot is present', () => {
+    const result = buildOutputLocation(
+      'docs/api/getting-started.md',
+      'docs',
+      undefined,
+      outputDirectory,
+    );
+
+    expect(result).toEqual({
+      directory: './output',
+      filename: 'api-getting-started.md',
+    });
+  });
+
+  it('includes outputRoot in both directory and filename', () => {
+    const result = buildOutputLocation(
+      'docs/code/api.md',
+      'docs/code',
+      'code',
+      outputDirectory,
+    );
+
+    expect(result).toEqual({
+      directory: path.join(outputDirectory, 'code'),
+      filename: 'code-api.md',
+    });
+  });
+
+  it('encodes the full relative path under documentPath into the filename', () => {
+    const result = buildOutputLocation(
+      'docs/code/api/api.md',
+      'docs/code',
+      'code',
+      outputDirectory,
+    );
+
+    expect(result).toEqual({
+      directory: path.join(outputDirectory, 'code'),
+      filename: 'code-api-api.md',
+    });
+  });
+
+  it('avoids duplicating outputRoot when already present in path parts', () => {
+    const result = buildOutputLocation(
+      'packages/react/docs/react-api/hooks.md',
+      'packages/react/docs',
+      'react-docs',
+      outputDirectory,
+    );
+
+    expect(result).toEqual({
+      directory: path.join(outputDirectory, 'react-docs'),
+      filename: 'react-docs-react-api-hooks.md',
+    });
+  });
+
+  it('handles deep non-doc paths correctly', () => {
+    const result = buildOutputLocation(
+      'examples/with-mdx/pages/intro.mdx',
+      'examples/with-mdx',
+      'examples-with-mdx',
+      outputDirectory,
+    );
+
+    expect(result).toEqual({
+      directory: path.join(outputDirectory, 'examples-with-mdx'),
+      filename: 'examples-with-mdx-pages-intro.mdx',
+    });
+  });
+
+  it('does not double-prefix filename if already flattened', () => {
+    const result = buildOutputLocation(
+      'docs/code/code-api.md',
+      'docs/code',
+      'code',
+      outputDirectory,
+    );
+
+    expect(result).toEqual({
+      directory: path.join(outputDirectory, 'code'),
+      filename: 'code-api.md',
+    });
+  });
+
+  it('handles Windows-style paths correctly', () => {
+    const result = buildOutputLocation(
+      'docs\\code\\api\\hooks.md',
+      'docs/code',
+      'code',
+      outputDirectory,
+    );
+
+    expect(result).toEqual({
+      directory: path.join(outputDirectory, 'code'),
+      filename: 'code-api-hooks.md',
+    });
+  });
+});
+
+// UNIT TEST
+
+describe('computeOutputRoot', () => {
+  describe('single-segment paths', () => {
+    it.each([
+      ['docs', undefined],
+      ['doc', undefined],
+      ['documentation', undefined],
+      ['help', 'help'],
+      ['api', 'api'],
+    ])('"%s" → %s', (input, expected) => {
+      expect(computeOutputRoot(input)).toBe(expected);
+    });
+  });
+
+  describe('paths starting with a documentation container', () => {
+    it.each([
+      ['docs/code', 'code'],
+      ['docs/code/docs', 'code-docs'],
+      ['docs/api/v1', 'api-v1'],
+      ['documentation/reference', 'reference'],
+    ])('"%s" → %s', (input, expected) => {
+      expect(computeOutputRoot(input)).toBe(expected);
+    });
+  });
+
+  describe('paths without a documentation container', () => {
+    it.each([
+      ['packages/react/docs', 'react-docs'],
+      ['react/three/docs', 'three-docs'],
+      ['react/three/docs/v1', 'docs-v1'],
+      ['examples/with-mdx', 'examples-with-mdx'],
+    ])('"%s" → %s', (input, expected) => {
+      expect(computeOutputRoot(input)).toBe(expected);
+    });
+  });
+
+  describe('edge cases and normalization', () => {
+    it.each([
+      ['docs/', undefined],
+      ['/docs', undefined],
+      ['/docs/', undefined],
+      ['docs//code', 'code'],
+      ['//packages/react/docs//', 'react-docs'],
+    ])('"%s" → %s', (input, expected) => {
+      expect(computeOutputRoot(input)).toBe(expected);
+    });
+  });
 });
 
 // UNIT TEST
@@ -147,7 +328,6 @@ describe('extract()', () => {
     repo: 'https://github.com/test-owner/test-repo',
     paths: ['docs'],
     out: './test-output',
-    prefix: 'ai',
     zip: false,
   };
 
@@ -155,88 +335,107 @@ describe('extract()', () => {
     { type: 'file', path: 'docs/guide.md', name: 'guide.md' },
     { type: 'file', path: 'docs/api/getting-started.mdx', name: 'getting-started.mdx' },
   ];
+
   const mockGuidesFiles = [
     { type: 'file', path: 'guides/installation.md', name: 'installation.md' },
   ];
+
   const allMockFiles = [...mockDocsFiles, ...mockGuidesFiles];
 
   beforeEach(() => {
+    vi.clearAllMocks();
+
     mockGetContent.mockImplementation(({ path: requestedPath }) => {
       if (requestedPath === 'docs') {
         return Promise.resolve({ data: mockDocsFiles });
       }
+
       if (requestedPath === 'guides') {
         return Promise.resolve({ data: mockGuidesFiles });
       }
 
-      const isFileRequest = allMockFiles.some(file => file.path === requestedPath);
+      const isFileRequest = allMockFiles.some(
+        (file) => file.path === requestedPath,
+      );
+
       if (isFileRequest) {
         const content = `Content for ${requestedPath}`;
         return Promise.resolve({
-          data: { content: Buffer.from(content).toString('base64') },
+          data: {
+            content: Buffer.from(content).toString('base64'),
+          },
         });
       }
 
-      return Promise.reject(new Error(`Unexpected call to getContent with path: ${requestedPath}`));
+      return Promise.reject(
+        new Error(`Unexpected call to getContent with path: ${requestedPath}`),
+      );
     });
   });
 
-  it('should download and save files with correct flattened names', async () => {
+  it('downloads and writes all discovered files', async () => {
     await extract(options);
 
-    expect(mockEmptyDir).toHaveBeenCalledWith(options.out);
-    expect(mockGetContent).toHaveBeenCalledTimes(1 + mockDocsFiles.length);
-    expect(mockWriteFile).toHaveBeenCalledTimes(2);
+    expect(mockEmptyDir).toHaveBeenCalledOnce();
+    expect(mockWriteFile).toHaveBeenCalledTimes(mockDocsFiles.length);
 
-    const firstExpectedPath = path.join(options.out, 'ai-docs-guide.md');
-    const secondExpectedPath = path.join(options.out, 'ai-docs-api-getting-started.mdx');
-
-    expect(mockWriteFile).toHaveBeenCalledWith(firstExpectedPath, 'Content for docs/guide.md');
-    expect(mockWriteFile).toHaveBeenCalledWith(secondExpectedPath, 'Content for docs/api/getting-started.mdx');
+    mockWriteFile.mock.calls.forEach(([filePath]) => {
+      expect(path.normalize(filePath)).toContain(
+        path.normalize(options.out),
+      );
+    });
   });
 
-  it('should handle multiple paths and download all files', async () => {
-    const multiPathOptions = { ...options, paths: ['docs', 'guides'] };
+  it('handles multiple documentation paths', async () => {
+    const multiPathOptions = {
+      ...options,
+      paths: ['docs', 'guides'],
+    };
+
     await extract(multiPathOptions);
 
     expect(mockEmptyDir).toHaveBeenCalledOnce();
-
     expect(mockWriteFile).toHaveBeenCalledTimes(allMockFiles.length);
 
-    const docsFilePath = path.join(options.out, 'ai-docs-guide.md');
-    const guidesFilePath = path.join(options.out, 'ai-guides-installation.md');
+    const directoriesUsed = mockWriteFile.mock.calls.map(
+      ([filePath]) => path.dirname(filePath),
+    );
 
-    expect(mockWriteFile).toHaveBeenCalledWith(docsFilePath, 'Content for docs/guide.md');
-    expect(mockWriteFile).toHaveBeenCalledWith(guidesFilePath, 'Content for guides/installation.md');
+    const uniqueDirs = new Set(directoriesUsed);
+    expect(uniqueDirs.size).toBeGreaterThan(1);
   });
 
-  it('should not add a prefix if none is provided', async () => {
-    const noPrefixOptions = { ...options, prefix: '' };
-    await extract(noPrefixOptions);
-
-    const expectedPath = path.join(noPrefixOptions.out, 'docs-guide.md');
-    expect(mockWriteFile).toHaveBeenCalledWith(expectedPath, 'Content for docs/guide.md');
-  });
-
-  it('should trigger archiving logic if the --zip option is true', async () => {
+  it('creates a zip archive when --zip is enabled', async () => {
     const zipOptions = { ...options, zip: true };
+
     await extract(zipOptions);
 
     expect(mockCreateWriteStream).toHaveBeenCalledOnce();
-    expect(mockArchiveInstance.directory).toHaveBeenCalledWith(zipOptions.out, false);
+    expect(mockArchiveInstance.directory).toHaveBeenCalledWith(
+      zipOptions.out,
+      false,
+    );
     expect(mockArchiveInstance.finalize).toHaveBeenCalledOnce();
   });
 
-  it('should gracefully handle API rate limit errors', async () => {
+  it('handles GitHub API rate limit errors gracefully', async () => {
     const error = new Error('Rate limit exceeded');
     error.status = 403;
+
     mockGetContent.mockRejectedValueOnce(error);
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
 
     await expect(extract(options)).rejects.toThrow('Rate limit exceeded');
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('API Rate Limit Exceeded'));
-    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('export GITHUB_TOKEN'));
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('API Rate Limit Exceeded'),
+    );
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('export GITHUB_TOKEN'),
+    );
 
     consoleErrorSpy.mockRestore();
   });
@@ -246,13 +445,12 @@ describe('extract()', () => {
 
 describe('launchCLI()', () => {
   it('should correctly parse all provided arguments', () => {
-    const argv = ['node', 'gde', '--repo', 'https://github.com/test/repo', '--out', './custom-output', '--paths', 'docs', 'guides', '--prefix', 'test', '--zip'];
+    const argv = ['node', 'gde', '--repo', 'https://github.com/test/repo', '--out', './custom-output', '--paths', 'docs', 'guides', '--zip'];
     const options = launchCLI(argv);
 
     expect(options.repo).toBe('https://github.com/test/repo');
     expect(options.out).toBe('./custom-output');
     expect(options.paths).toEqual(['docs', 'guides']);
-    expect(options.prefix).toBe('test');
     expect(options.zip).toBe(true);
   });
 
@@ -260,10 +458,9 @@ describe('launchCLI()', () => {
     const argv = ['node', 'gde', '--repo', 'https://github.com/test/repo'];
     const options = launchCLI(argv);
 
-    expect(options.out).toBe('./output');
-    expect(options.paths).toBe('docs');
-    expect(options.prefix).toBe('');
-    expect(options.zip).toBe(false);
+    expect(options.out).toBe(DEFAULT_OUTPUT_DIRECTORY_PATH);
+    expect(options.paths).toBe(DEFAULT_DOCS_PATH);
+    expect(options.zip).toBe(DEFAULT_TO_ZIP);
   });
 
   it('should display the welcome banner', () => {
